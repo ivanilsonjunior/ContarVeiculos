@@ -3,25 +3,25 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Natal Traffic Monitor — Monza Palace Hotel</title>
+  <title>Traffic Monitor</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow:wght@300;400;600;800&display=swap" rel="stylesheet" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
   <style>
-    /* ── Reset & tokens ──────────────────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --bg:       #080c10;
-      --surface:  #0e1520;
-      --border:   #1c2d42;
-      --accent:   #00d4ff;
-      --accent2:  #ff6b35;
-      --green:    #39ff6e;
-      --text:     #c8dcea;
-      --muted:    #4a6a82;
-      --mono:     'Share Tech Mono', monospace;
-      --sans:     'Barlow', sans-serif;
+      --bg:      #080c10;
+      --surf:    #0e1520;
+      --surf2:   #121b27;
+      --border:  #1c2d42;
+      --accent:  #00d4ff;
+      --accent2: #ff6b35;
+      --green:   #39ff6e;
+      --text:    #c8dcea;
+      --muted:   #4a6a82;
+      --mono:    'Share Tech Mono', monospace;
+      --sans:    'Barlow', sans-serif;
     }
 
     html, body {
@@ -33,62 +33,48 @@
       overflow-x: hidden;
     }
 
-    /* ── Scanline overlay ─────────────────────────────────────────── */
     body::after {
       content: '';
       position: fixed; inset: 0;
-      background: repeating-linear-gradient(
-        0deg,
-        transparent,
-        transparent 2px,
-        rgba(0,212,255,0.015) 2px,
-        rgba(0,212,255,0.015) 4px
-      );
+      background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,212,255,0.012) 2px, rgba(0,212,255,0.012) 4px);
       pointer-events: none;
       z-index: 9999;
     }
 
-    /* ── Header ──────────────────────────────────────────────────── */
+    /* ── Header ──────────────────────────────────── */
     header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 18px 32px;
+      padding: 14px 28px;
       border-bottom: 1px solid var(--border);
       background: linear-gradient(90deg, #080c10 0%, #0a1320 100%);
     }
-
-    .logo {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
     .logo-title {
       font-family: var(--mono);
-      font-size: 1.1rem;
+      font-size: 1rem;
       color: var(--accent);
       letter-spacing: 3px;
       text-transform: uppercase;
     }
     .logo-sub {
-      font-size: 0.72rem;
+      font-size: 0.68rem;
       color: var(--muted);
       letter-spacing: 1.5px;
       text-transform: uppercase;
+      margin-top: 2px;
     }
-
     .header-right {
       display: flex;
       align-items: center;
-      gap: 28px;
+      gap: 24px;
     }
-
     .live-badge {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 7px;
       font-family: var(--mono);
-      font-size: 0.75rem;
+      font-size: 0.72rem;
       color: var(--green);
       letter-spacing: 2px;
     }
@@ -99,33 +85,123 @@
       box-shadow: 0 0 8px var(--green);
       animation: pulse 1.4s ease-in-out infinite;
     }
-    @keyframes pulse {
-      0%,100% { opacity: 1; transform: scale(1); }
-      50%      { opacity: 0.4; transform: scale(0.7); }
-    }
+    @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.7)} }
+    #clock { font-family: var(--mono); font-size: 0.82rem; color: var(--muted); }
 
-    #clock {
-      font-family: var(--mono);
-      font-size: 0.85rem;
+    /* ── Stream tabs ─────────────────────────────── */
+    .tabs-bar {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 10px 28px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surf);
+      overflow-x: auto;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) transparent;
+    }
+    .tabs-bar::-webkit-scrollbar { height: 4px; }
+    .tabs-bar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    .stream-tab {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 16px;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 3px;
       color: var(--muted);
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      letter-spacing: 1px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all .15s;
     }
+    .stream-tab:hover  { border-color: var(--accent); color: var(--text); }
+    .stream-tab.active { border-color: var(--accent); color: var(--accent); background: rgba(0,212,255,.07); }
+    .tab-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); flex-shrink: 0; }
+    .tab-dot.ok    { background: var(--green); box-shadow: 0 0 5px var(--green); }
+    .tab-dot.err   { background: #f87171; }
+    .tab-dot.warn  { background: var(--accent2); }
 
-    /* ── Main layout ─────────────────────────────────────────────── */
+    .btn-add-tab {
+      padding: 7px 14px;
+      background: transparent;
+      border: 1px dashed var(--border);
+      border-radius: 3px;
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all .15s;
+      flex-shrink: 0;
+    }
+    .btn-add-tab:hover { border-color: var(--accent); color: var(--accent); }
+
+    .tabs-actions {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    .btn-sm {
+      padding: 5px 12px;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      cursor: pointer;
+      transition: all .15s;
+    }
+    .btn-sm:hover         { color: var(--text); border-color: var(--text); }
+    .btn-sm.btn-danger:hover { color: #f87171; border-color: #f87171; }
+
+    /* ── Empty state ─────────────────────────────── */
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 18px;
+      padding: 80px 20px;
+    }
+    .empty-state p { color: var(--muted); font-size: 0.9rem; letter-spacing: 1px; }
+    .btn-primary {
+      padding: 10px 24px;
+      background: rgba(0,212,255,.1);
+      border: 1px solid var(--accent);
+      border-radius: 3px;
+      color: var(--accent);
+      font-family: var(--mono);
+      font-size: 0.82rem;
+      letter-spacing: 1px;
+      cursor: pointer;
+      transition: background .15s;
+    }
+    .btn-primary:hover { background: rgba(0,212,255,.18); }
+
+    /* ── Main layout ─────────────────────────────── */
     main {
       display: grid;
-      grid-template-columns: 1fr 500px;
+      grid-template-columns: 1fr 480px;
       grid-template-rows: auto auto 1fr;
-      gap: 20px;
-      padding: 24px 32px;
-      min-height: calc(100vh - 70px);
+      gap: 18px;
+      padding: 20px 28px 52px;
+      min-height: calc(100vh - 120px);
     }
 
-    /* ── Cards ───────────────────────────────────────────────────── */
+    /* ── Cards ───────────────────────────────────── */
     .card {
-      background: var(--surface);
+      background: var(--surf);
       border: 1px solid var(--border);
       border-radius: 4px;
-      padding: 22px 26px;
+      padding: 20px 24px;
       position: relative;
     }
     .card::before {
@@ -136,575 +212,869 @@
       background: linear-gradient(90deg, var(--accent), transparent);
     }
     .card-label {
-      font-size: 0.68rem;
+      font-size: 0.66rem;
       letter-spacing: 2.5px;
       text-transform: uppercase;
       color: var(--muted);
       margin-bottom: 10px;
     }
 
-    /* ── KPI row ─────────────────────────────────────────────────── */
+    /* ── KPI row ─────────────────────────────────── */
     .kpi-row {
       grid-column: 1 / -1;
       display: grid;
       grid-template-columns: repeat(4, 1fr);
-      gap: 16px;
+      gap: 14px;
     }
-
     .kpi-card {
-      background: var(--surface);
+      background: var(--surf);
       border: 1px solid var(--border);
       border-radius: 4px;
-      padding: 20px 24px;
+      padding: 18px 22px;
       position: relative;
       overflow: hidden;
     }
-    .kpi-card::after {
-      content: attr(data-icon);
-      position: absolute;
-      right: 18px; bottom: 12px;
-      font-size: 2.2rem;
-      opacity: 0.07;
-      pointer-events: none;
-    }
-    .kpi-label {
-      font-size: 0.65rem;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      color: var(--muted);
-      margin-bottom: 8px;
-    }
-    .kpi-value {
-      font-family: var(--mono);
-      font-size: 2.6rem;
-      font-weight: 400;
-      color: var(--accent);
-      line-height: 1;
-      transition: color 0.3s;
-    }
-    .kpi-value.highlight { color: var(--green); }
-    .kpi-sub {
-      font-size: 0.72rem;
-      color: var(--muted);
-      margin-top: 6px;
-    }
-
-    /* Accent bar no topo de cada KPI */
-    .kpi-card:nth-child(1)::before { background: var(--accent); }
-    .kpi-card:nth-child(2)::before { background: var(--green); }
-    .kpi-card:nth-child(3)::before { background: var(--accent2); }
-    .kpi-card:nth-child(4)::before { background: #a855f7; }
     .kpi-card::before {
       content: '';
       position: absolute;
       top: 0; left: 0; right: 0;
       height: 2px;
     }
-
-    /* ── Chart section ───────────────────────────────────────────── */
-    .chart-section {
-      grid-column: 1;
-      grid-row: 2;
+    .kpi-card:nth-child(1)::before { background: var(--accent); }
+    .kpi-card:nth-child(2)::before { background: var(--green); }
+    .kpi-card:nth-child(3)::before { background: var(--accent2); }
+    .kpi-card:nth-child(4)::before { background: #a855f7; }
+    .kpi-card::after {
+      content: attr(data-icon);
+      position: absolute;
+      right: 16px; bottom: 10px;
+      font-size: 2rem;
+      opacity: 0.07;
+      pointer-events: none;
     }
-    .chart-wrapper {
-      position: relative;
-      height: 260px;
-      margin-top: 12px;
-    }
+    .kpi-label { font-size: 0.63rem; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+    .kpi-value { font-family: var(--mono); font-size: 2.4rem; color: var(--accent); line-height: 1; }
+    .kpi-value.hl { color: var(--green); }
+    .kpi-sub   { font-size: 0.7rem; color: var(--muted); margin-top: 5px; }
 
-    /* ── Snapshot section ────────────────────────────────────────── */
-    .snapshot-section {
+    /* ── Chart ───────────────────────────────────── */
+    .chart-section  { grid-column: 1; grid-row: 2; }
+    .chart-wrapper  { position: relative; height: 240px; margin-top: 10px; }
+
+    /* ── Snapshot ────────────────────────────────── */
+    .snap-section {
       grid-column: 2;
       grid-row: 2 / 4;
       display: flex;
       flex-direction: column;
-      gap: 16px;
+      gap: 14px;
     }
-
-    .snapshot-img-wrapper {
+    .snap-card { background: var(--surf); border: 1px solid var(--border); border-radius: 4px; }
+    .snap-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 18px 0;
+    }
+    .snap-img-wrap {
       position: relative;
       border-radius: 3px;
       overflow: hidden;
-      border: 1px solid var(--border);
       background: #000;
       aspect-ratio: 16/9;
+      margin: 10px 18px 0;
     }
-    .snapshot-img-wrapper a {
-      display: block;
-      width: 100%;
-      height: 100%;
-      cursor: zoom-in;
-    }
-    #snapshot {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      display: block;
-      opacity: 0.95;
-      transition: opacity 0.2s;
-    }
-    .snapshot-img-wrapper a:hover #snapshot { opacity: 1; }
-    .snap-hint {
-      position: absolute;
-      top: 8px; right: 10px;
-      font-family: var(--mono);
-      font-size: 0.62rem;
-      color: rgba(200,220,234,0.55);
-      letter-spacing: 1px;
+    .snap-img-wrap a { display: block; width: 100%; height: 100%; cursor: zoom-in; }
+    #snapshot { width: 100%; height: 100%; object-fit: cover; display: block; opacity: .95; transition: opacity .2s; }
+    .snap-img-wrap a:hover #snapshot { opacity: 1; }
+    .snap-overlay {
+      position: absolute; inset: 0;
+      background: linear-gradient(to bottom, transparent 60%, rgba(8,12,16,.85));
       pointer-events: none;
     }
-    .snapshot-overlay {
+    .snap-ts {
       position: absolute;
-      inset: 0;
-      background: linear-gradient(
-        to bottom,
-        transparent 60%,
-        rgba(8,12,16,0.85)
-      );
-    }
-    .snapshot-ts {
-      position: absolute;
-      bottom: 10px; left: 14px;
+      bottom: 9px; left: 13px;
       font-family: var(--mono);
-      font-size: 0.7rem;
-      color: rgba(200,220,234,0.8);
+      font-size: 0.68rem;
+      color: rgba(200,220,234,.8);
     }
+    .snap-hint {
+      position: absolute;
+      top: 7px; right: 9px;
+      font-family: var(--mono);
+      font-size: 0.6rem;
+      color: rgba(200,220,234,.45);
+      pointer-events: none;
+    }
+    .snap-actions { padding: 10px 18px 14px; display: flex; justify-content: flex-end; }
 
-    /* ── Vehicle breakdown ───────────────────────────────────────── */
+    /* ── Breakdown ───────────────────────────────── */
     .breakdown-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 10px;
-      margin-top: 12px;
+      gap: 9px;
+      margin-top: 10px;
     }
     .veh-item {
       display: flex;
       align-items: center;
-      gap: 12px;
-      padding: 12px 14px;
-      background: rgba(0,212,255,0.04);
+      gap: 10px;
+      padding: 10px 12px;
+      background: rgba(0,212,255,.03);
       border: 1px solid var(--border);
       border-radius: 3px;
     }
-    .veh-dot {
-      width: 10px; height: 10px;
-      border-radius: 50%;
-      flex-shrink: 0;
+    .veh-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+    .veh-name { font-size: 0.65rem; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); }
+    .veh-count { font-family: var(--mono); font-size: 1.25rem; color: var(--text); }
+
+    /* ── History ─────────────────────────────────── */
+    .hist-section { grid-column: 1; grid-row: 3; }
+    .hist-scroll  { max-height: 300px; overflow-y: auto; margin-top: 12px; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+    .hist-scroll::-webkit-scrollbar { width: 4px; }
+    .hist-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+    .hist-table { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 0.76rem; }
+    .hist-table thead th { text-align: left; padding: 5px 10px; color: var(--muted); letter-spacing: 1.5px; text-transform: uppercase; font-size: 0.63rem; border-bottom: 1px solid var(--border); }
+    .hist-table tbody tr { border-bottom: 1px solid rgba(28,45,66,.5); transition: background .12s; }
+    .hist-table tbody tr:hover { background: rgba(0,212,255,.04); }
+    .hist-table tbody td { padding: 6px 10px; }
+    .hist-table tbody td:first-child { color: var(--muted); }
+    .hist-table tbody td.hl { color: var(--accent); }
+
+    /* ── Footer ──────────────────────────────────── */
+    footer {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      height: 30px;
+      background: var(--surf);
+      border-top: 1px solid var(--border);
+      display: flex; align-items: center; gap: 22px;
+      padding: 0 28px;
+      font-family: var(--mono); font-size: 0.68rem; color: var(--muted);
+      z-index: 100;
     }
-    .veh-info { flex: 1; }
-    .veh-name {
+    .s-ok   { color: var(--green); }
+    .s-warn { color: var(--accent2); }
+    .s-err  { color: #f87171; }
+
+    /* ── Modals ──────────────────────────────────── */
+    .modal-backdrop {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.7);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal {
+      background: var(--surf2);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      padding: 28px 32px;
+      width: 460px;
+      max-width: 95vw;
+      position: relative;
+    }
+    .modal-title {
+      font-family: var(--mono);
+      font-size: 0.9rem;
+      color: var(--accent);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-bottom: 22px;
+    }
+    .modal label {
+      display: block;
       font-size: 0.68rem;
       letter-spacing: 1.5px;
       text-transform: uppercase;
       color: var(--muted);
+      margin-bottom: 6px;
     }
-    .veh-count {
-      font-family: var(--mono);
-      font-size: 1.3rem;
-      color: var(--text);
-    }
-
-    /* ── History table ───────────────────────────────────────────── */
-    .history-section {
-      grid-column: 1;
-      grid-row: 3;
-    }
-    .hist-scroll {
-      max-height: 320px;
-      overflow-y: auto;
-      margin-top: 14px;
-      scrollbar-width: thin;
-      scrollbar-color: var(--border) transparent;
-    }
-    .hist-scroll::-webkit-scrollbar { width: 5px; }
-    .hist-scroll::-webkit-scrollbar-track { background: transparent; }
-    .hist-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-
-    .hist-table {
+    .modal input {
       width: 100%;
-      border-collapse: collapse;
-      font-family: var(--mono);
-      font-size: 0.78rem;
-    }
-    .hist-table thead th {
-      text-align: left;
-      padding: 6px 12px;
-      color: var(--muted);
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
-      font-size: 0.65rem;
-      border-bottom: 1px solid var(--border);
-    }
-    .hist-table tbody tr {
-      border-bottom: 1px solid rgba(28,45,66,0.5);
-      transition: background 0.15s;
-    }
-    .hist-table tbody tr:hover { background: rgba(0,212,255,0.04); }
-    .hist-table tbody td {
-      padding: 7px 12px;
+      padding: 9px 12px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 3px;
       color: var(--text);
-    }
-    .hist-table tbody td:first-child { color: var(--muted); }
-    .hist-table tbody td.highlight { color: var(--accent); }
-
-    /* ── Status bar ──────────────────────────────────────────────── */
-    footer {
-      position: fixed;
-      bottom: 0; left: 0; right: 0;
-      height: 32px;
-      background: var(--surface);
-      border-top: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      gap: 24px;
-      padding: 0 32px;
       font-family: var(--mono);
-      font-size: 0.7rem;
-      color: var(--muted);
-      z-index: 100;
+      font-size: 0.82rem;
+      margin-bottom: 16px;
+      outline: none;
+      transition: border-color .15s;
     }
-    .status-ok   { color: var(--green); }
-    .status-warn { color: var(--accent2); }
-    .status-err  { color: #f87171; }
+    .modal input:focus { border-color: var(--accent); }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px; }
+    .btn-cancel {
+      padding: 8px 18px;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 0.76rem;
+      cursor: pointer;
+      transition: all .15s;
+    }
+    .btn-cancel:hover { color: var(--text); border-color: var(--text); }
+    .btn-save {
+      padding: 8px 20px;
+      background: rgba(0,212,255,.1);
+      border: 1px solid var(--accent);
+      border-radius: 3px;
+      color: var(--accent);
+      font-family: var(--mono);
+      font-size: 0.76rem;
+      cursor: pointer;
+      transition: background .15s;
+    }
+    .btn-save:hover { background: rgba(0,212,255,.18); }
+    .btn-del {
+      padding: 8px 18px;
+      background: transparent;
+      border: 1px solid #f87171;
+      border-radius: 3px;
+      color: #f87171;
+      font-family: var(--mono);
+      font-size: 0.76rem;
+      cursor: pointer;
+      margin-right: auto;
+      transition: background .15s;
+    }
+    .btn-del:hover { background: rgba(248,113,113,.1); }
 
-    /* ── Responsividade básica ───────────────────────────────────── */
-    @media (max-width: 900px) {
-      main {
-        grid-template-columns: 1fr;
-        padding: 16px;
-      }
+    /* ── ROI modal ───────────────────────────────── */
+    .modal-roi { width: min(780px, 95vw); }
+    .roi-hint {
+      font-size: 0.72rem;
+      color: var(--muted);
+      letter-spacing: .5px;
+      margin-bottom: 12px;
+    }
+    .roi-canvas-wrap {
+      position: relative;
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      overflow: hidden;
+      background: #000;
+      cursor: crosshair;
+    }
+    #roi-canvas { display: block; width: 100%; height: auto; }
+    .roi-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; gap: 10px; }
+    .roi-btns-left { display: flex; gap: 8px; }
+    .roi-btns-right { display: flex; gap: 8px; }
+
+    /* ── Responsive ──────────────────────────────── */
+    @media (max-width: 860px) {
+      main { grid-template-columns: 1fr; padding: 14px 14px 52px; }
       .kpi-row { grid-template-columns: repeat(2, 1fr); }
-      .snapshot-section { grid-column: 1; grid-row: auto; }
-      .chart-section, .history-section { grid-column: 1; }
+      .snap-section { grid-column: 1; grid-row: auto; }
+      .chart-section, .hist-section { grid-column: 1; }
     }
   </style>
 </head>
 <body>
 
-  <!-- ── Header ──────────────────────────────────────────────────────── -->
-  <header>
-    <div class="logo">
-      <span class="logo-title">NATAL TRAFFIC MONITOR</span>
-      <span class="logo-sub">Monza Palace Hotel · Rio Grande do Norte · BR</span>
-    </div>
-    <div class="header-right">
-      <div class="live-badge">
-        <div class="live-dot"></div>
-        AO VIVO
-      </div>
-      <div id="clock">--:--:--</div>
-    </div>
-  </header>
+<!-- ── Header ─────────────────────────────────────────────────────────── -->
+<header>
+  <div>
+    <div class="logo-title">TRAFFIC MONITOR</div>
+    <div class="logo-sub" id="stream-sub">Carregando…</div>
+  </div>
+  <div class="header-right">
+    <div class="live-badge"><div class="live-dot"></div>AO VIVO</div>
+    <div id="clock">--:--:--</div>
+  </div>
+</header>
 
-  <!-- ── Main ────────────────────────────────────────────────────────── -->
-  <main>
+<!-- ── Stream tabs ────────────────────────────────────────────────────── -->
+<div class="tabs-bar" id="tabs-bar">
+  <button class="btn-add-tab" onclick="openModalStream()">+ Novo Fluxo</button>
+  <div class="tabs-actions" id="stream-actions" style="display:none;">
+    <button class="btn-sm" onclick="openModalStream(currentStreamId)">✎ Editar</button>
+    <button class="btn-sm btn-danger" onclick="deleteStream(currentStreamId)">✕ Excluir</button>
+  </div>
+</div>
 
-    <!-- KPIs -->
-    <div class="kpi-row">
-      <div class="kpi-card" data-icon="🚗">
-        <div class="kpi-label">Média último minuto</div>
-        <div class="kpi-value" id="kpi-avg-min">—</div>
-        <div class="kpi-sub">veículos / captura</div>
+<!-- ── Dashboard ──────────────────────────────────────────────────────── -->
+<div id="empty-state" class="empty-state" style="display:none;">
+  <p>NENHUM FLUXO CADASTRADO</p>
+  <button class="btn-primary" onclick="openModalStream()">+ Adicionar primeiro fluxo</button>
+</div>
+
+<main id="dashboard" style="display:none;">
+
+  <!-- KPIs -->
+  <div class="kpi-row">
+    <div class="kpi-card" data-icon="🚗">
+      <div class="kpi-label">Média último minuto</div>
+      <div class="kpi-value" id="kpi-avg-min">—</div>
+      <div class="kpi-sub">veículos / captura</div>
+    </div>
+    <div class="kpi-card" data-icon="📈">
+      <div class="kpi-label">Média móvel 10 min</div>
+      <div class="kpi-value hl" id="kpi-ma10">—</div>
+      <div class="kpi-sub">média das últimas 10 médias</div>
+    </div>
+    <div class="kpi-card" data-icon="🎯">
+      <div class="kpi-label">Última leitura</div>
+      <div class="kpi-value" id="kpi-last">—</div>
+      <div class="kpi-sub" id="kpi-last-ts">—</div>
+    </div>
+    <div class="kpi-card" data-icon="⏱">
+      <div class="kpi-label">Amostras coletadas</div>
+      <div class="kpi-value" id="kpi-samples">—</div>
+      <div class="kpi-sub">nas últimas 24 horas</div>
+    </div>
+  </div>
+
+  <!-- Chart -->
+  <div class="card chart-section">
+    <div class="card-label">Média móvel 10 minutos — veículos por captura</div>
+    <div class="chart-wrapper"><canvas id="chart-ma"></canvas></div>
+  </div>
+
+  <!-- Snapshot + breakdown -->
+  <div class="snap-section">
+    <div class="snap-card">
+      <div class="snap-card-header">
+        <div class="card-label" style="margin:0;">Câmera ao vivo</div>
       </div>
-      <div class="kpi-card" data-icon="📈">
-        <div class="kpi-label">Média móvel 10 min</div>
-        <div class="kpi-value highlight" id="kpi-ma10">—</div>
-        <div class="kpi-sub">média das últimas 10 médias</div>
+      <div class="snap-img-wrap">
+        <a id="snap-link" href="#" target="_blank" rel="noopener">
+          <img id="snapshot" src="" alt="Webcam" />
+        </a>
+        <div class="snap-overlay"></div>
+        <div class="snap-ts" id="snap-ts">carregando…</div>
+        <div class="snap-hint">⤢ abrir em nova guia</div>
       </div>
-      <div class="kpi-card" data-icon="🎯">
-        <div class="kpi-label">Última leitura</div>
-        <div class="kpi-value" id="kpi-last">—</div>
-        <div class="kpi-sub" id="kpi-last-ts">—</div>
-      </div>
-      <div class="kpi-card" data-icon="⏱">
-        <div class="kpi-label">Amostras coletadas</div>
-        <div class="kpi-value" id="kpi-samples">—</div>
-        <div class="kpi-sub">nas últimas 24 horas</div>
+      <div class="snap-actions">
+        <button class="btn-sm" onclick="openModalROI(currentStreamId)">⬡ Definir Área de Detecção</button>
       </div>
     </div>
 
-    <!-- Gráfico de média móvel -->
-    <div class="card chart-section">
-      <div class="card-label">Média móvel 10 minutos — carros por captura</div>
-      <div class="chart-wrapper">
-        <canvas id="chart-ma"></canvas>
-      </div>
-    </div>
-
-    <!-- Snapshot + breakdown -->
-    <div class="snapshot-section">
-      <div class="card" style="padding:0; border:none;">
-        <div class="card-label" style="padding:18px 20px 0;">Câmera ao vivo</div>
-        <div style="padding:10px 20px 18px;">
-          <div class="snapshot-img-wrapper">
-            <a href="/api/snapshot" target="_blank" rel="noopener">
-              <img id="snapshot" src="/api/snapshot" alt="Webcam Natal" />
-            </a>
-            <div class="snapshot-overlay"></div>
-            <div class="snapshot-ts" id="snap-ts">carregando…</div>
-            <div class="snap-hint">⤢ abrir em nova guia</div>
-          </div>
+    <div class="card" style="flex:1;">
+      <div class="card-label">Veículos detectados agora</div>
+      <div class="breakdown-grid">
+        <div class="veh-item">
+          <div class="veh-dot" style="background:#00d4ff;box-shadow:0 0 5px #00d4ff;"></div>
+          <div><div class="veh-name">Carros</div><div class="veh-count" id="v-car">—</div></div>
+        </div>
+        <div class="veh-item">
+          <div class="veh-dot" style="background:#ff6b35;box-shadow:0 0 5px #ff6b35;"></div>
+          <div><div class="veh-name">Motos</div><div class="veh-count" id="v-moto">—</div></div>
+        </div>
+        <div class="veh-item">
+          <div class="veh-dot" style="background:#dc5050;box-shadow:0 0 5px #dc5050;"></div>
+          <div><div class="veh-name">Ônibus</div><div class="veh-count" id="v-bus">—</div></div>
+        </div>
+        <div class="veh-item">
+          <div class="veh-dot" style="background:#39ff6e;box-shadow:0 0 5px #39ff6e;"></div>
+          <div><div class="veh-name">Caminhões</div><div class="veh-count" id="v-truck">—</div></div>
         </div>
       </div>
+    </div>
+  </div>
 
-      <div class="card">
-        <div class="card-label">Veículos detectados agora</div>
-        <div class="breakdown-grid">
-          <div class="veh-item">
-            <div class="veh-dot" style="background:#00d4ff;box-shadow:0 0 6px #00d4ff;"></div>
-            <div class="veh-info">
-              <div class="veh-name">Carros</div>
-              <div class="veh-count" id="v-car">—</div>
-            </div>
-          </div>
-          <div class="veh-item">
-            <div class="veh-dot" style="background:#ff6b35;box-shadow:0 0 6px #ff6b35;"></div>
-            <div class="veh-info">
-              <div class="veh-name">Motos</div>
-              <div class="veh-count" id="v-moto">—</div>
-            </div>
-          </div>
-          <div class="veh-item">
-            <div class="veh-dot" style="background:#dc5050;box-shadow:0 0 6px #dc5050;"></div>
-            <div class="veh-info">
-              <div class="veh-name">Ônibus</div>
-              <div class="veh-count" id="v-bus">—</div>
-            </div>
-          </div>
-          <div class="veh-item">
-            <div class="veh-dot" style="background:#39ff6e;box-shadow:0 0 6px #39ff6e;"></div>
-            <div class="veh-info">
-              <div class="veh-name">Caminhões</div>
-              <div class="veh-count" id="v-truck">—</div>
-            </div>
-          </div>
-        </div>
+  <!-- History -->
+  <div class="card hist-section">
+    <div class="card-label">Histórico — médias por 3 segundos (últimas 24h)</div>
+    <div class="hist-scroll">
+      <table class="hist-table">
+        <thead><tr><th>Horário</th><th>Média veículos</th><th>Variação</th></tr></thead>
+        <tbody id="hist-body">
+          <tr><td colspan="3" style="padding:14px 10px;color:var(--muted);">Coletando dados…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<!-- ── Footer ─────────────────────────────────────────────────────────── -->
+<footer>
+  <span>STATUS: <span id="status-txt" class="s-warn">iniciando</span></span>
+  <span id="stream-footer">FLUXO: —</span>
+  <span>INTERVALO: 10s</span>
+  <span id="last-update">Última atualização: —</span>
+</footer>
+
+<!-- ── Modal: Novo/Editar Fluxo ───────────────────────────────────────── -->
+<div class="modal-backdrop" id="modal-stream">
+  <div class="modal">
+    <div class="modal-title" id="modal-stream-title">Novo Fluxo</div>
+    <label>Nome do fluxo</label>
+    <input type="text" id="inp-name" placeholder="Ex: Natal — Monza Palace" />
+    <label>URL do player ou stream</label>
+    <input type="text" id="inp-url" placeholder="https://… ou rtsp://…" />
+    <div class="modal-actions">
+      <button class="btn-del" id="btn-del-stream" style="display:none;" onclick="deleteCurrentEditing()">Excluir</button>
+      <button class="btn-cancel" onclick="closeModalStream()">Cancelar</button>
+      <button class="btn-save" onclick="saveStream()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: Área de Detecção (ROI) ─────────────────────────────────── -->
+<div class="modal-backdrop" id="modal-roi">
+  <div class="modal modal-roi">
+    <div class="modal-title" id="modal-roi-title">Área de Detecção</div>
+    <div class="roi-hint">
+      Clique para adicionar pontos ao polígono. Mínimo 3 pontos.
+      O polígono fecha automaticamente ao conectar no primeiro ponto.
+    </div>
+    <div class="roi-canvas-wrap">
+      <canvas id="roi-canvas"></canvas>
+    </div>
+    <div class="roi-actions">
+      <div class="roi-btns-left">
+        <button class="btn-sm" onclick="roiUndo()">↩ Desfazer</button>
+        <button class="btn-sm" onclick="roiClear()">✕ Limpar</button>
+        <button class="btn-sm btn-danger" onclick="roiRemove()">Remover área</button>
+      </div>
+      <div class="roi-btns-right">
+        <button class="btn-cancel" onclick="closeModalROI()">Cancelar</button>
+        <button class="btn-save" onclick="saveROI()">Salvar</button>
       </div>
     </div>
+  </div>
+</div>
 
-    <!-- Histórico por minuto -->
-    <div class="card history-section">
-      <div class="card-label">Histórico — médias por minuto (últimas 24 horas)</div>
-      <div class="hist-scroll">
-        <table class="hist-table">
-          <thead>
-            <tr>
-              <th>Minuto</th>
-              <th>Média veículos</th>
-              <th>Variação</th>
-            </tr>
-          </thead>
-          <tbody id="hist-body">
-            <tr><td colspan="3" style="padding:16px 12px;color:var(--muted);">Coletando dados…</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
+<!-- ── Scripts ────────────────────────────────────────────────────────── -->
+<script>
+// ── Clock ──────────────────────────────────────────────────────────────
+setInterval(() => {
+  document.getElementById('clock').textContent = new Date().toLocaleTimeString('pt-BR');
+}, 1000);
 
-  </main>
+// ── State ──────────────────────────────────────────────────────────────
+let streams        = [];
+let currentStreamId = null;
+let editingStreamId = null;
 
-  <!-- ── Footer status bar ────────────────────────────────────────────── -->
-  <footer>
-    <span>STATUS: <span id="status-txt" class="status-warn">iniciando</span></span>
-    <span>ENDPOINT: <code style="color:var(--accent);">GET /api/stats</code></span>
-    <span>INTERVALO: 10s</span>
-    <span id="last-update">Última atualização: —</span>
-  </footer>
-
-  <!-- ── Scripts ──────────────────────────────────────────────────────── -->
-  <script>
-    // ── Relógio ────────────────────────────────────────────────────────
-    const clockEl = document.getElementById('clock');
-    function atualizarRelogio() {
-      clockEl.textContent = new Date().toLocaleTimeString('pt-BR');
-    }
-    setInterval(atualizarRelogio, 1000);
-    atualizarRelogio();
-
-    // ── Chart.js ───────────────────────────────────────────────────────
-    const ctx = document.getElementById('chart-ma').getContext('2d');
-
-    const chartData = {
-      labels: [],
-      datasets: [
-        {
-          label: 'Média por minuto',
-          data: [],
-          borderColor: '#00d4ff',
-          backgroundColor: 'rgba(0,212,255,0.08)',
-          borderWidth: 2,
-          pointRadius: 4,
-          pointBackgroundColor: '#00d4ff',
-          tension: 0.35,
-          fill: true,
-        },
-        {
-          label: 'Média móvel 10 min',
-          data: [],
-          borderColor: '#39ff6e',
-          backgroundColor: 'transparent',
-          borderWidth: 2,
-          borderDash: [6, 3],
-          pointRadius: 0,
-          tension: 0.3,
-          fill: false,
-        }
-      ]
-    };
-
-    const chart = new Chart(ctx, {
-      type: 'line',
-      data: chartData,
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        animation: { duration: 400 },
-        interaction: { mode: 'index', intersect: false },
-        plugins: {
-          legend: {
-            labels: {
-              color: '#4a6a82',
-              font: { family: "'Share Tech Mono'", size: 11 },
-              boxWidth: 20,
-            }
-          },
-          tooltip: {
-            backgroundColor: '#0e1520',
-            borderColor: '#1c2d42',
-            borderWidth: 1,
-            titleColor: '#c8dcea',
-            bodyColor: '#c8dcea',
-            titleFont: { family: "'Share Tech Mono'" },
-            bodyFont: { family: "'Share Tech Mono'" },
-          }
-        },
-        scales: {
-          x: {
-            ticks: {
-              color: '#4a6a82',
-              font: { family: "'Share Tech Mono'", size: 10 },
-              maxRotation: 0,
-            },
-            grid: { color: 'rgba(28,45,66,0.6)' },
-          },
-          y: {
-            beginAtZero: true,
-            ticks: {
-              color: '#4a6a82',
-              font: { family: "'Share Tech Mono'", size: 10 },
-              stepSize: 1,
-            },
-            grid: { color: 'rgba(28,45,66,0.6)' },
-          }
-        }
+// ── Chart ──────────────────────────────────────────────────────────────
+const chartCtx = document.getElementById('chart-ma').getContext('2d');
+const chart = new Chart(chartCtx, {
+  type: 'line',
+  data: {
+    labels: [],
+    datasets: [
+      {
+        label: 'Média por 3s',
+        data: [],
+        borderColor: '#00d4ff',
+        backgroundColor: 'rgba(0,212,255,0.08)',
+        borderWidth: 2,
+        pointRadius: 3,
+        pointBackgroundColor: '#00d4ff',
+        tension: 0.35,
+        fill: true,
+      },
+      {
+        label: 'Média móvel 10 min',
+        data: [],
+        borderColor: '#39ff6e',
+        backgroundColor: 'transparent',
+        borderWidth: 2,
+        borderDash: [6, 3],
+        pointRadius: 0,
+        tension: 0.3,
+        fill: false,
       }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: { duration: 300 },
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { labels: { color: '#4a6a82', font: { family: "'Share Tech Mono'", size: 11 }, boxWidth: 18 } },
+      tooltip: {
+        backgroundColor: '#0e1520', borderColor: '#1c2d42', borderWidth: 1,
+        titleColor: '#c8dcea', bodyColor: '#c8dcea',
+        titleFont: { family: "'Share Tech Mono'" }, bodyFont: { family: "'Share Tech Mono'" },
+      }
+    },
+    scales: {
+      x: { ticks: { color: '#4a6a82', font: { family: "'Share Tech Mono'", size: 10 }, maxRotation: 0 }, grid: { color: 'rgba(28,45,66,0.6)' } },
+      y: { beginAtZero: true, ticks: { color: '#4a6a82', font: { family: "'Share Tech Mono'", size: 10 }, stepSize: 1 }, grid: { color: 'rgba(28,45,66,0.6)' } }
+    }
+  }
+});
+
+// ── Stream list ────────────────────────────────────────────────────────
+async function loadStreams() {
+  try {
+    const r = await fetch('/api/streams');
+    streams = await r.json();
+
+    renderTabs();
+
+    if (streams.length === 0) {
+      document.getElementById('dashboard').style.display    = 'none';
+      document.getElementById('empty-state').style.display  = 'flex';
+      document.getElementById('stream-actions').style.display = 'none';
+      currentStreamId = null;
+      return;
+    }
+    document.getElementById('empty-state').style.display = 'none';
+    document.getElementById('dashboard').style.display   = 'grid';
+
+    // If current stream no longer exists, switch to first
+    if (!currentStreamId || !streams.find(s => s.id === currentStreamId)) {
+      selectStream(streams[0].id);
+    }
+  } catch (e) {
+    console.error('loadStreams:', e);
+  }
+}
+
+function renderTabs() {
+  const bar = document.getElementById('tabs-bar');
+  // Remove existing tabs (keep btn-add and tabs-actions)
+  bar.querySelectorAll('.stream-tab').forEach(el => el.remove());
+  const addBtn = bar.querySelector('.btn-add-tab');
+
+  streams.forEach(s => {
+    const tab = document.createElement('button');
+    tab.className = 'stream-tab' + (s.id === currentStreamId ? ' active' : '');
+    tab.dataset.id = s.id;
+
+    const dotClass = s.status === 'ok' ? 'ok' : s.status === 'sem_imagem' ? 'err' : 'warn';
+    tab.innerHTML = `<span class="tab-dot ${dotClass}"></span>${s.name}`;
+    tab.onclick = () => selectStream(s.id);
+    bar.insertBefore(tab, addBtn);
+  });
+
+  document.getElementById('stream-actions').style.display =
+    (currentStreamId && streams.length > 0) ? 'flex' : 'none';
+}
+
+function selectStream(id) {
+  currentStreamId = id;
+  const s = streams.find(s => s.id === id);
+
+  document.querySelectorAll('.stream-tab').forEach(t =>
+    t.classList.toggle('active', t.dataset.id === id)
+  );
+  document.getElementById('stream-actions').style.display = 'flex';
+
+  if (s) {
+    document.getElementById('stream-sub').textContent = s.name;
+    document.getElementById('stream-footer').textContent = `FLUXO: ${s.name}`;
+
+    // Update snapshot link and src
+    const snapUrl = `/api/streams/${id}/snapshot`;
+    document.getElementById('snap-link').href = snapUrl;
+    document.getElementById('snapshot').src   = snapUrl + '?t=' + Date.now();
+  }
+
+  fetchStats();
+}
+
+// ── Stats polling ──────────────────────────────────────────────────────
+async function fetchStats() {
+  if (!currentStreamId) return;
+  try {
+    const r = await fetch(`/api/streams/${currentStreamId}/stats`);
+    const d = await r.json();
+
+    document.getElementById('kpi-avg-min').textContent  = d.avg_last_minute.toFixed(1);
+    document.getElementById('kpi-ma10').textContent     = d.moving_avg_10min.toFixed(1);
+    document.getElementById('kpi-samples').textContent  = d.samples_count;
+
+    const stEl = document.getElementById('status-txt');
+    stEl.textContent = d.status;
+    stEl.className   = d.status === 'ok' ? 's-ok' : d.status === 'sem_imagem' ? 's-err' : 's-warn';
+
+    document.getElementById('last-update').textContent =
+      'Última atualização: ' + new Date().toLocaleTimeString('pt-BR');
+
+    if (d.last_sample) {
+      document.getElementById('kpi-last').textContent  = d.last_sample.total;
+      document.getElementById('v-car').textContent     = d.last_sample.car   ?? 0;
+      document.getElementById('v-moto').textContent    = d.last_sample.motorcycle ?? 0;
+      document.getElementById('v-bus').textContent     = d.last_sample.bus   ?? 0;
+      document.getElementById('v-truck').textContent   = d.last_sample.truck ?? 0;
+      const tsLocal = new Date(d.last_sample.ts).toLocaleTimeString('pt-BR');
+      document.getElementById('kpi-last-ts').textContent = tsLocal;
+      document.getElementById('snap-ts').textContent     = tsLocal;
+    }
+
+    // History table
+    const hist24   = d.history_24h ?? [];
+    const histBody = document.getElementById('hist-body');
+    if (hist24.length === 0) {
+      histBody.innerHTML = '<tr><td colspan="3" style="padding:14px 10px;color:var(--muted);">Aguardando dados…</td></tr>';
+    } else {
+      histBody.innerHTML = [...hist24].reverse().map((h, i, arr) => {
+        const ts   = new Date(h.ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        const prev = arr[i + 1];
+        let vt = '—', vc = 'var(--muted)';
+        if (prev) {
+          const delta = h.avg - prev.avg;
+          vt = (delta >= 0 ? '▲ +' : '▼ ') + Math.abs(delta).toFixed(1);
+          vc = delta > 0 ? 'var(--accent2)' : delta < 0 ? 'var(--green)' : 'var(--muted)';
+        }
+        return `<tr><td>${ts}</td><td class="hl">${h.avg.toFixed(1)}</td><td style="color:${vc}">${vt}</td></tr>`;
+      }).join('');
+    }
+
+    // Chart
+    const hist10 = d.history_10min ?? [];
+    if (hist10.length > 0) {
+      const labels = hist10.map(h =>
+        new Date(h.ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+      );
+      const vals = hist10.map(h => h.avg);
+      const ma   = vals.map((_, i) => {
+        const sl = vals.slice(0, i + 1);
+        return sl.reduce((a, b) => a + b, 0) / sl.length;
+      });
+      chart.data.labels           = labels;
+      chart.data.datasets[0].data = vals;
+      chart.data.datasets[1].data = ma;
+      chart.update('none');
+    }
+  } catch (e) {
+    console.error('fetchStats:', e);
+  }
+}
+
+function refreshSnapshot() {
+  if (!currentStreamId) return;
+  const img = document.getElementById('snapshot');
+  img.src = `/api/streams/${currentStreamId}/snapshot?t=` + Date.now();
+}
+
+// ── Modal: Novo/Editar Fluxo ───────────────────────────────────────────
+function openModalStream(id = null) {
+  editingStreamId = id;
+  const s = id ? streams.find(s => s.id === id) : null;
+
+  document.getElementById('modal-stream-title').textContent = s ? 'Editar Fluxo' : 'Novo Fluxo';
+  document.getElementById('inp-name').value = s ? s.name : '';
+  document.getElementById('inp-url').value  = s ? s.url  : '';
+  document.getElementById('btn-del-stream').style.display = s ? 'block' : 'none';
+  document.getElementById('modal-stream').classList.add('open');
+  setTimeout(() => document.getElementById('inp-name').focus(), 50);
+}
+
+function closeModalStream() {
+  document.getElementById('modal-stream').classList.remove('open');
+  editingStreamId = null;
+}
+
+async function saveStream() {
+  const name = document.getElementById('inp-name').value.trim();
+  const url  = document.getElementById('inp-url').value.trim();
+  if (!name || !url) { alert('Preencha nome e URL.'); return; }
+
+  try {
+    if (editingStreamId) {
+      await fetch(`/api/streams/${editingStreamId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, url }),
+      });
+    } else {
+      const r = await fetch('/api/streams', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, url }),
+      });
+      const s = await r.json();
+      currentStreamId = s.id;
+    }
+    closeModalStream();
+    await loadStreams();
+    if (editingStreamId) selectStream(editingStreamId);
+  } catch (e) {
+    console.error('saveStream:', e);
+  }
+}
+
+async function deleteStream(id) {
+  const s = streams.find(s => s.id === id);
+  if (!s || !confirm(`Excluir o fluxo "${s.name}"? O histórico será apagado.`)) return;
+  await fetch(`/api/streams/${id}`, { method: 'DELETE' });
+  currentStreamId = null;
+  await loadStreams();
+}
+
+function deleteCurrentEditing() {
+  closeModalStream();
+  deleteStream(editingStreamId);
+}
+
+// ── Modal: ROI ─────────────────────────────────────────────────────────
+let roiCtx, roiImg, roiPoints = [], roiStreamId = null, roiClosed = false;
+
+function openModalROI(id) {
+  roiStreamId = id;
+  const s     = streams.find(s => s.id === id);
+  roiPoints   = s?.detection_zone ? s.detection_zone.map(p => [...p]) : [];
+  roiClosed   = roiPoints.length >= 3;
+
+  document.getElementById('modal-roi-title').textContent =
+    `Área de Detecção — ${s?.name ?? id}`;
+  document.getElementById('modal-roi').classList.add('open');
+
+  const canvas = document.getElementById('roi-canvas');
+  roiCtx       = canvas.getContext('2d');
+
+  roiImg        = new Image();
+  roiImg.onload = () => {
+    const maxW = canvas.parentElement.clientWidth;
+    const scale = Math.min(maxW / roiImg.naturalWidth, 1);
+    canvas.width  = roiImg.naturalWidth  * scale;
+    canvas.height = roiImg.naturalHeight * scale;
+    redrawROI();
+  };
+  roiImg.onerror = () => {
+    const canvas = document.getElementById('roi-canvas');
+    canvas.width  = 640;
+    canvas.height = 360;
+    roiCtx.fillStyle = '#0e1520';
+    roiCtx.fillRect(0, 0, canvas.width, canvas.height);
+    roiCtx.fillStyle = '#4a6a82';
+    roiCtx.font = '14px monospace';
+    roiCtx.fillText('Sem imagem disponível', 220, 180);
+    redrawROI();
+  };
+  roiImg.src = `/api/streams/${id}/snapshot?t=` + Date.now();
+}
+
+function closeModalROI() {
+  document.getElementById('modal-roi').classList.remove('open');
+  roiStreamId = null;
+}
+
+function redrawROI() {
+  const canvas = document.getElementById('roi-canvas');
+  roiCtx.clearRect(0, 0, canvas.width, canvas.height);
+
+  if (roiImg?.complete && roiImg.naturalWidth > 0) {
+    roiCtx.drawImage(roiImg, 0, 0, canvas.width, canvas.height);
+  }
+
+  if (roiPoints.length === 0) return;
+
+  const px = pt => ({ x: pt[0] * canvas.width, y: pt[1] * canvas.height });
+  const pts = roiPoints.map(px);
+
+  roiCtx.beginPath();
+  roiCtx.moveTo(pts[0].x, pts[0].y);
+  for (let i = 1; i < pts.length; i++) roiCtx.lineTo(pts[i].x, pts[i].y);
+  if (roiClosed) roiCtx.closePath();
+
+  if (roiClosed && pts.length >= 3) {
+    roiCtx.fillStyle = 'rgba(0,212,255,0.18)';
+    roiCtx.fill();
+  }
+  roiCtx.strokeStyle = '#00d4ff';
+  roiCtx.lineWidth   = 2;
+  roiCtx.stroke();
+
+  // Draw points
+  pts.forEach((pt, i) => {
+    roiCtx.beginPath();
+    roiCtx.arc(pt.x, pt.y, i === 0 ? 7 : 5, 0, Math.PI * 2);
+    roiCtx.fillStyle = i === 0 ? '#ff6b35' : '#00d4ff';
+    roiCtx.fill();
+  });
+}
+
+// Canvas click/dblclick
+const roiCanvas = document.getElementById('roi-canvas');
+let _lastClickTime = 0;
+
+roiCanvas.addEventListener('click', e => {
+  if (roiClosed) return;
+  const now = Date.now();
+  if (now - _lastClickTime < 300) return; // ignore clicks from dblclick
+  _lastClickTime = now;
+
+  const rect = roiCanvas.getBoundingClientRect();
+  const x    = (e.clientX - rect.left)  / rect.width;
+  const y    = (e.clientY - rect.top)   / rect.height;
+
+  // Close polygon if click near first point (within 2.5% of canvas size)
+  if (roiPoints.length >= 3) {
+    const dx = Math.abs(x - roiPoints[0][0]);
+    const dy = Math.abs(y - roiPoints[0][1]);
+    if (dx < 0.025 && dy < 0.025) {
+      roiClosed = true;
+      redrawROI();
+      return;
+    }
+  }
+  roiPoints.push([x, y]);
+  redrawROI();
+});
+
+roiCanvas.addEventListener('dblclick', e => {
+  _lastClickTime = Date.now();
+  if (roiPoints.length >= 3) {
+    roiClosed = true;
+    redrawROI();
+  }
+});
+
+function roiUndo() {
+  if (roiClosed) { roiClosed = false; }
+  else if (roiPoints.length > 0) { roiPoints.pop(); }
+  redrawROI();
+}
+
+function roiClear() {
+  roiPoints = [];
+  roiClosed = false;
+  redrawROI();
+}
+
+function roiRemove() {
+  roiPoints = [];
+  roiClosed = false;
+  redrawROI();
+}
+
+async function saveROI() {
+  const zone = (roiClosed && roiPoints.length >= 3) ? roiPoints : null;
+  try {
+    await fetch(`/api/streams/${roiStreamId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ detection_zone: zone }),
     });
+    closeModalROI();
+    await loadStreams();
+  } catch (e) {
+    console.error('saveROI:', e);
+  }
+}
 
-    // ── Busca de dados ─────────────────────────────────────────────────
-    let prevAvg = null;
+// ── Close modals on backdrop click ────────────────────────────────────
+document.getElementById('modal-stream').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeModalStream();
+});
+document.getElementById('modal-roi').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeModalROI();
+});
 
-    async function fetchStats() {
-      try {
-        const r = await fetch('/api/stats');
-        const d = await r.json();
+// ── Keyboard shortcuts ─────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { closeModalStream(); closeModalROI(); }
+});
 
-        // KPIs
-        document.getElementById('kpi-avg-min').textContent =
-          d.avg_last_minute.toFixed(1);
-        document.getElementById('kpi-ma10').textContent =
-          d.moving_avg_10min.toFixed(1);
-
-        const statusEl  = document.getElementById('status-txt');
-        statusEl.textContent = d.status;
-        statusEl.className   = d.status === 'ok'
-          ? 'status-ok'
-          : d.status === 'sem_imagem' ? 'status-err' : 'status-warn';
-
-        document.getElementById('last-update').textContent =
-          'Última atualização: ' + new Date().toLocaleTimeString('pt-BR');
-
-        // Última leitura
-        if (d.last_sample) {
-          document.getElementById('kpi-last').textContent    = d.last_sample.total;
-          document.getElementById('v-car').textContent       = d.last_sample.car ?? 0;
-          document.getElementById('v-moto').textContent      = d.last_sample.motorcycle ?? 0;
-          document.getElementById('v-bus').textContent       = d.last_sample.bus ?? 0;
-          document.getElementById('v-truck').textContent     = d.last_sample.truck ?? 0;
-
-          const tsLocal = new Date(d.last_sample.ts).toLocaleTimeString('pt-BR');
-          document.getElementById('kpi-last-ts').textContent = tsLocal;
-          document.getElementById('snap-ts').textContent     = tsLocal;
-        }
-
-        // Histórico 24h para tabela
-        const hist24  = d.history_24h ?? [];
-        const hist10  = d.history_10min ?? [];
-        const histBody = document.getElementById('hist-body');
-
-        if (hist24.length === 0) {
-          histBody.innerHTML =
-            '<tr><td colspan="3" style="padding:16px 12px;color:var(--muted);">Aguardando dados…</td></tr>';
-        } else {
-          histBody.innerHTML = [...hist24].reverse().map((h, i, arr) => {
-            const tsLocal = new Date(h.ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-            const prev    = arr[i + 1];
-            let var_txt = '—', var_color = 'var(--muted)';
-            if (prev) {
-              const delta = h.avg - prev.avg;
-              var_txt   = (delta >= 0 ? '▲ +' : '▼ ') + Math.abs(delta).toFixed(1);
-              var_color = delta > 0 ? 'var(--accent2)' : delta < 0 ? '#39ff6e' : 'var(--muted)';
-            }
-            return `
-              <tr>
-                <td>${tsLocal}</td>
-                <td class="highlight">${h.avg.toFixed(1)}</td>
-                <td style="color:${var_color};">${var_txt}</td>
-              </tr>`;
-          }).join('');
-        }
-
-        // Amostras totais
-        const sr = await fetch('/api/status');
-        const sd = await sr.json();
-        document.getElementById('kpi-samples').textContent = sd.samples_count;
-
-        // Gráfico (últimos 10 min)
-        const hist = hist10;
-        if (hist.length > 0) {
-          const labels  = hist.map(h =>
-            new Date(h.ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-          );
-          const perMin  = hist.map(h => h.avg);
-
-          // Linha de média móvel: média cumulativa dos pontos disponíveis
-          const ma = perMin.map((_, i) => {
-            const slice = perMin.slice(0, i + 1);
-            return slice.reduce((a, b) => a + b, 0) / slice.length;
-          });
-
-          chart.data.labels              = labels;
-          chart.data.datasets[0].data    = perMin;
-          chart.data.datasets[1].data    = ma;
-          chart.update('none');
-        }
-
-        prevAvg = d.moving_avg_10min;
-      } catch (e) {
-        console.error('Erro ao buscar stats:', e);
-      }
-    }
-
-    // Atualiza snapshot com cache-bust
-    function refreshSnapshot() {
-      const img = document.getElementById('snapshot');
-      img.src   = '/api/snapshot?t=' + Date.now();
-    }
-
-    // Inicia
-    fetchStats();
-    setInterval(fetchStats,       10_000);   // a cada 10s
-    setInterval(refreshSnapshot,  12_000);   // a cada 12s (ligeiramente defasado)
-  </script>
+// ── Init ───────────────────────────────────────────────────────────────
+loadStreams();
+setInterval(fetchStats,       10_000);
+setInterval(refreshSnapshot,  12_000);
+setInterval(loadStreams,       30_000);
+</script>
 
 </body>
 </html>
