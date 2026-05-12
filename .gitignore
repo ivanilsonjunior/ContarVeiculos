@@ -71,3 +71,4 @@ Thumbs.db
 *.onnx
 *.zip
 *.tar.gz
+*.db
