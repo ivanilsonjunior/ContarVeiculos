@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Natal Traffic Monitor — Monza Palace Hotel</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow:wght@300;400;600;800&display=swap" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <style>
+    /* ── Reset & tokens ──────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #080c10;
+      --surface:  #0e1520;
+      --border:   #1c2d42;
+      --accent:   #00d4ff;
+      --accent2:  #ff6b35;
+      --green:    #39ff6e;
+      --text:     #c8dcea;
+      --muted:    #4a6a82;
+      --mono:     'Share Tech Mono', monospace;
+      --sans:     'Barlow', sans-serif;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 15px;
+      overflow-x: hidden;
+    }
+
+    /* ── Scanline overlay ─────────────────────────────────────────── */
+    body::after {
+      content: '';
+      position: fixed; inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,212,255,0.015) 2px,
+        rgba(0,212,255,0.015) 4px
+      );
+      pointer-events: none;
+      z-index: 9999;
+    }
+
+    /* ── Header ──────────────────────────────────────────────────── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 32px;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(90deg, #080c10 0%, #0a1320 100%);
+    }
+
+    .logo {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .logo-title {
+      font-family: var(--mono);
+      font-size: 1.1rem;
+      color: var(--accent);
+      letter-spacing: 3px;
+      text-transform: uppercase;
+    }
+    .logo-sub {
+      font-size: 0.72rem;
+      color: var(--muted);
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 28px;
+    }
+
+    .live-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-family: var(--mono);
+      font-size: 0.75rem;
+      color: var(--green);
+      letter-spacing: 2px;
+    }
+    .live-dot {
+      width: 8px; height: 8px;
+      background: var(--green);
+      border-radius: 50%;
+      box-shadow: 0 0 8px var(--green);
+      animation: pulse 1.4s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%,100% { opacity: 1; transform: scale(1); }
+      50%      { opacity: 0.4; transform: scale(0.7); }
+    }
+
+    #clock {
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    /* ── Main layout ─────────────────────────────────────────────── */
+    main {
+      display: grid;
+      grid-template-columns: 1fr 380px;
+      grid-template-rows: auto auto 1fr;
+      gap: 20px;
+      padding: 24px 32px;
+      min-height: calc(100vh - 70px);
+    }
+
+    /* ── Cards ───────────────────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 22px 26px;
+      position: relative;
+    }
+    .card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, var(--accent), transparent);
+    }
+    .card-label {
+      font-size: 0.68rem;
+      letter-spacing: 2.5px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+
+    /* ── KPI row ─────────────────────────────────────────────────── */
+    .kpi-row {
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+    }
+
+    .kpi-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 20px 24px;
+      position: relative;
+      overflow: hidden;
+    }
+    .kpi-card::after {
+      content: attr(data-icon);
+      position: absolute;
+      right: 18px; bottom: 12px;
+      font-size: 2.2rem;
+      opacity: 0.07;
+      pointer-events: none;
+    }
+    .kpi-label {
+      font-size: 0.65rem;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+    .kpi-value {
+      font-family: var(--mono);
+      font-size: 2.6rem;
+      font-weight: 400;
+      color: var(--accent);
+      line-height: 1;
+      transition: color 0.3s;
+    }
+    .kpi-value.highlight { color: var(--green); }
+    .kpi-sub {
+      font-size: 0.72rem;
+      color: var(--muted);
+      margin-top: 6px;
+    }
+
+    /* Accent bar no topo de cada KPI */
+    .kpi-card:nth-child(1)::before { background: var(--accent); }
+    .kpi-card:nth-child(2)::before { background: var(--green); }
+    .kpi-card:nth-child(3)::before { background: var(--accent2); }
+    .kpi-card:nth-child(4)::before { background: #a855f7; }
+    .kpi-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+    }
+
+    /* ── Chart section ───────────────────────────────────────────── */
+    .chart-section {
+      grid-column: 1;
+      grid-row: 2;
+    }
+    .chart-wrapper {
+      position: relative;
+      height: 260px;
+      margin-top: 12px;
+    }
+
+    /* ── Snapshot section ────────────────────────────────────────── */
+    .snapshot-section {
+      grid-column: 2;
+      grid-row: 2 / 4;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .snapshot-img-wrapper {
+      position: relative;
+      border-radius: 3px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      background: #000;
+      aspect-ratio: 16/9;
+    }
+    #snapshot {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      opacity: 0.95;
+    }
+    .snapshot-overlay {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        to bottom,
+        transparent 60%,
+        rgba(8,12,16,0.85)
+      );
+    }
+    .snapshot-ts {
+      position: absolute;
+      bottom: 10px; left: 14px;
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      color: rgba(200,220,234,0.8);
+    }
+
+    /* ── Vehicle breakdown ───────────────────────────────────────── */
+    .breakdown-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .veh-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 14px;
+      background: rgba(0,212,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+    }
+    .veh-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .veh-info { flex: 1; }
+    .veh-name {
+      font-size: 0.68rem;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .veh-count {
+      font-family: var(--mono);
+      font-size: 1.3rem;
+      color: var(--text);
+    }
+
+    /* ── History table ───────────────────────────────────────────── */
+    .history-section {
+      grid-column: 1;
+      grid-row: 3;
+    }
+
+    .hist-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 14px;
+      font-family: var(--mono);
+      font-size: 0.78rem;
+    }
+    .hist-table thead th {
+      text-align: left;
+      padding: 6px 12px;
+      color: var(--muted);
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      font-size: 0.65rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .hist-table tbody tr {
+      border-bottom: 1px solid rgba(28,45,66,0.5);
+      transition: background 0.15s;
+    }
+    .hist-table tbody tr:hover { background: rgba(0,212,255,0.04); }
+    .hist-table tbody td {
+      padding: 7px 12px;
+      color: var(--text);
+    }
+    .hist-table tbody td:first-child { color: var(--muted); }
+    .hist-table tbody td.highlight { color: var(--accent); }
+
+    /* ── Status bar ──────────────────────────────────────────────── */
+    footer {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      height: 32px;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      padding: 0 32px;
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      color: var(--muted);
+      z-index: 100;
+    }
+    .status-ok   { color: var(--green); }
+    .status-warn { color: var(--accent2); }
+    .status-err  { color: #f87171; }
+
+    /* ── Responsividade básica ───────────────────────────────────── */
+    @media (max-width: 900px) {
+      main {
+        grid-template-columns: 1fr;
+        padding: 16px;
+      }
+      .kpi-row { grid-template-columns: repeat(2, 1fr); }
+      .snapshot-section { grid-column: 1; grid-row: auto; }
+      .chart-section, .history-section { grid-column: 1; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── Header ──────────────────────────────────────────────────────── -->
+  <header>
+    <div class="logo">
+      <span class="logo-title">NATAL TRAFFIC MONITOR</span>
+      <span class="logo-sub">Monza Palace Hotel · Rio Grande do Norte · BR</span>
+    </div>
+    <div class="header-right">
+      <div class="live-badge">
+        <div class="live-dot"></div>
+        AO VIVO
+      </div>
+      <div id="clock">--:--:--</div>
+    </div>
+  </header>
+
+  <!-- ── Main ────────────────────────────────────────────────────────── -->
+  <main>
+
+    <!-- KPIs -->
+    <div class="kpi-row">
+      <div class="kpi-card" data-icon="🚗">
+        <div class="kpi-label">Média último minuto</div>
+        <div class="kpi-value" id="kpi-avg-min">—</div>
+        <div class="kpi-sub">veículos / captura</div>
+      </div>
+      <div class="kpi-card" data-icon="📈">
+        <div class="kpi-label">Média móvel 10 min</div>
+        <div class="kpi-value highlight" id="kpi-ma10">—</div>
+        <div class="kpi-sub">média das últimas 10 médias</div>
+      </div>
+      <div class="kpi-card" data-icon="🎯">
+        <div class="kpi-label">Última leitura</div>
+        <div class="kpi-value" id="kpi-last">—</div>
+        <div class="kpi-sub" id="kpi-last-ts">—</div>
+      </div>
+      <div class="kpi-card" data-icon="⏱">
+        <div class="kpi-label">Amostras coletadas</div>
+        <div class="kpi-value" id="kpi-samples">—</div>
+        <div class="kpi-sub">nas últimas 2 horas</div>
+      </div>
+    </div>
+
+    <!-- Gráfico de média móvel -->
+    <div class="card chart-section">
+      <div class="card-label">Média móvel 10 minutos — carros por captura</div>
+      <div class="chart-wrapper">
+        <canvas id="chart-ma"></canvas>
+      </div>
+    </div>
+
+    <!-- Snapshot + breakdown -->
+    <div class="snapshot-section">
+      <div class="card" style="padding:0; border:none;">
+        <div class="card-label" style="padding:18px 20px 0;">Câmera ao vivo</div>
+        <div style="padding:10px 20px 18px;">
+          <div class="snapshot-img-wrapper">
+            <img id="snapshot" src="/api/snapshot" alt="Webcam Natal" />
+            <div class="snapshot-overlay"></div>
+            <div class="snapshot-ts" id="snap-ts">carregando…</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-label">Veículos detectados agora</div>
+        <div class="breakdown-grid">
+          <div class="veh-item">
+            <div class="veh-dot" style="background:#00d4ff;box-shadow:0 0 6px #00d4ff;"></div>
+            <div class="veh-info">
+              <div class="veh-name">Carros</div>
+              <div class="veh-count" id="v-car">—</div>
+            </div>
+          </div>
+          <div class="veh-item">
+            <div class="veh-dot" style="background:#ff6b35;box-shadow:0 0 6px #ff6b35;"></div>
+            <div class="veh-info">
+              <div class="veh-name">Motos</div>
+              <div class="veh-count" id="v-moto">—</div>
+            </div>
+          </div>
+          <div class="veh-item">
+            <div class="veh-dot" style="background:#dc5050;box-shadow:0 0 6px #dc5050;"></div>
+            <div class="veh-info">
+              <div class="veh-name">Ônibus</div>
+              <div class="veh-count" id="v-bus">—</div>
+            </div>
+          </div>
+          <div class="veh-item">
+            <div class="veh-dot" style="background:#39ff6e;box-shadow:0 0 6px #39ff6e;"></div>
+            <div class="veh-info">
+              <div class="veh-name">Caminhões</div>
+              <div class="veh-count" id="v-truck">—</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Histórico por minuto -->
+    <div class="card history-section">
+      <div class="card-label">Histórico — médias por minuto (últimos 10 min)</div>
+      <table class="hist-table">
+        <thead>
+          <tr>
+            <th>Minuto</th>
+            <th>Média veículos</th>
+            <th>Variação</th>
+          </tr>
+        </thead>
+        <tbody id="hist-body">
+          <tr><td colspan="3" style="padding:16px 12px;color:var(--muted);">Coletando dados…</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+  </main>
+
+  <!-- ── Footer status bar ────────────────────────────────────────────── -->
+  <footer>
+    <span>STATUS: <span id="status-txt" class="status-warn">iniciando</span></span>
+    <span>ENDPOINT: <code style="color:var(--accent);">GET /api/stats</code></span>
+    <span>INTERVALO: 10s</span>
+    <span id="last-update">Última atualização: —</span>
+  </footer>
+
+  <!-- ── Scripts ──────────────────────────────────────────────────────── -->
+  <script>
+    // ── Relógio ────────────────────────────────────────────────────────
+    const clockEl = document.getElementById('clock');
+    function atualizarRelogio() {
+      clockEl.textContent = new Date().toLocaleTimeString('pt-BR');
+    }
+    setInterval(atualizarRelogio, 1000);
+    atualizarRelogio();
+
+    // ── Chart.js ───────────────────────────────────────────────────────
+    const ctx = document.getElementById('chart-ma').getContext('2d');
+
+    const chartData = {
+      labels: [],
+      datasets: [
+        {
+          label: 'Média por minuto',
+          data: [],
+          borderColor: '#00d4ff',
+          backgroundColor: 'rgba(0,212,255,0.08)',
+          borderWidth: 2,
+          pointRadius: 4,
+          pointBackgroundColor: '#00d4ff',
+          tension: 0.35,
+          fill: true,
+        },
+        {
+          label: 'Média móvel 10 min',
+          data: [],
+          borderColor: '#39ff6e',
+          backgroundColor: 'transparent',
+          borderWidth: 2,
+          borderDash: [6, 3],
+          pointRadius: 0,
+          tension: 0.3,
+          fill: false,
+        }
+      ]
+    };
+
+    const chart = new Chart(ctx, {
+      type: 'line',
+      data: chartData,
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 400 },
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: {
+            labels: {
+              color: '#4a6a82',
+              font: { family: "'Share Tech Mono'", size: 11 },
+              boxWidth: 20,
+            }
+          },
+          tooltip: {
+            backgroundColor: '#0e1520',
+            borderColor: '#1c2d42',
+            borderWidth: 1,
+            titleColor: '#c8dcea',
+            bodyColor: '#c8dcea',
+            titleFont: { family: "'Share Tech Mono'" },
+            bodyFont: { family: "'Share Tech Mono'" },
+          }
+        },
+        scales: {
+          x: {
+            ticks: {
+              color: '#4a6a82',
+              font: { family: "'Share Tech Mono'", size: 10 },
+              maxRotation: 0,
+            },
+            grid: { color: 'rgba(28,45,66,0.6)' },
+          },
+          y: {
+            beginAtZero: true,
+            ticks: {
+              color: '#4a6a82',
+              font: { family: "'Share Tech Mono'", size: 10 },
+              stepSize: 1,
+            },
+            grid: { color: 'rgba(28,45,66,0.6)' },
+          }
+        }
+      }
+    });
+
+    // ── Busca de dados ─────────────────────────────────────────────────
+    let prevAvg = null;
+
+    async function fetchStats() {
+      try {
+        const r = await fetch('/api/stats');
+        const d = await r.json();
+
+        // KPIs
+        document.getElementById('kpi-avg-min').textContent =
+          d.avg_last_minute.toFixed(1);
+        document.getElementById('kpi-ma10').textContent =
+          d.moving_avg_10min.toFixed(1);
+
+        const statusEl  = document.getElementById('status-txt');
+        statusEl.textContent = d.status;
+        statusEl.className   = d.status === 'ok'
+          ? 'status-ok'
+          : d.status === 'sem_imagem' ? 'status-err' : 'status-warn';
+
+        document.getElementById('last-update').textContent =
+          'Última atualização: ' + new Date().toLocaleTimeString('pt-BR');
+
+        // Última leitura
+        if (d.last_sample) {
+          document.getElementById('kpi-last').textContent    = d.last_sample.total;
+          document.getElementById('v-car').textContent       = d.last_sample.car ?? 0;
+          document.getElementById('v-moto').textContent      = d.last_sample.motorcycle ?? 0;
+          document.getElementById('v-bus').textContent       = d.last_sample.bus ?? 0;
+          document.getElementById('v-truck').textContent     = d.last_sample.truck ?? 0;
+
+          const tsLocal = new Date(d.last_sample.ts).toLocaleTimeString('pt-BR');
+          document.getElementById('kpi-last-ts').textContent = tsLocal;
+          document.getElementById('snap-ts').textContent     = tsLocal;
+        }
+
+        // Histórico
+        const hist    = d.history_10min;
+        const histBody = document.getElementById('hist-body');
+
+        if (hist.length === 0) {
+          histBody.innerHTML =
+            '<tr><td colspan="3" style="padding:16px 12px;color:var(--muted);">Aguardando dados…</td></tr>';
+        } else {
+          histBody.innerHTML = [...hist].reverse().map((h, i, arr) => {
+            const tsLocal = new Date(h.ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+            const prev    = arr[i + 1];
+            let var_txt = '—', var_color = 'var(--muted)';
+            if (prev) {
+              const delta = h.avg - prev.avg;
+              var_txt   = (delta >= 0 ? '▲ +' : '▼ ') + Math.abs(delta).toFixed(1);
+              var_color = delta > 0 ? 'var(--accent2)' : delta < 0 ? '#39ff6e' : 'var(--muted)';
+            }
+            return `
+              <tr>
+                <td>${tsLocal}</td>
+                <td class="highlight">${h.avg.toFixed(1)}</td>
+                <td style="color:${var_color};">${var_txt}</td>
+              </tr>`;
+          }).join('');
+        }
+
+        // Amostras totais
+        const sr = await fetch('/api/status');
+        const sd = await sr.json();
+        document.getElementById('kpi-samples').textContent = sd.samples_count;
+
+        // Gráfico
+        if (hist.length > 0) {
+          const labels  = hist.map(h =>
+            new Date(h.ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+          );
+          const perMin  = hist.map(h => h.avg);
+
+          // Linha de média móvel: média cumulativa dos pontos disponíveis
+          const ma = perMin.map((_, i) => {
+            const slice = perMin.slice(0, i + 1);
+            return slice.reduce((a, b) => a + b, 0) / slice.length;
+          });
+
+          chart.data.labels              = labels;
+          chart.data.datasets[0].data    = perMin;
+          chart.data.datasets[1].data    = ma;
+          chart.update('none');
+        }
+
+        prevAvg = d.moving_avg_10min;
+      } catch (e) {
+        console.error('Erro ao buscar stats:', e);
+      }
+    }
+
+    // Atualiza snapshot com cache-bust
+    function refreshSnapshot() {
+      const img = document.getElementById('snapshot');
+      img.src   = '/api/snapshot?t=' + Date.now();
+    }
+
+    // Inicia
+    fetchStats();
+    setInterval(fetchStats,       10_000);   // a cada 10s
+    setInterval(refreshSnapshot,  12_000);   // a cada 12s (ligeiramente defasado)
+  </script>
+
+</body>
+</html>

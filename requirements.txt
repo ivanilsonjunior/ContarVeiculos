@@ -1,0 +1,6 @@
+flask
+ultralytics
+opencv-python
+requests
+Pillow
+yt-dlp
