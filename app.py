@@ -4,7 +4,7 @@ app.py — Servidor Flask
 Rotas:
   GET /                    → Dashboard HTML
   GET /api/stats           → JSON com todas as métricas
-  GET /api/history         → JSON com histórico bruto (últimas 2h)
+  GET /api/history         → JSON com histórico bruto (últimas 24h)
   GET /api/snapshot        → JPEG do último frame anotado
   GET /api/status          → Saúde do detector
 
@@ -65,7 +65,11 @@ def api_stats():
       },
       "history_10min": [
         {"ts": "...", "avg": 3.1},
-        ...                             # até 10 pontos, 1 por minuto
+        ...                             # últimos 10 pontos, 1 por minuto
+      ],
+      "history_24h": [
+        {"ts": "...", "avg": 3.1},
+        ...                             # todos os pontos das últimas 24h
       ]
     }
     """
@@ -79,6 +83,7 @@ def api_stats():
         "moving_avg_10min": d.moving_avg_10min,
         "last_sample":      None,
         "history_10min":    d.history_10min,
+        "history_24h":      d.history_24h,
     }
 
     if last:

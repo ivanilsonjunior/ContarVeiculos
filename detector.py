@@ -61,7 +61,8 @@ class VehicleDetector:
       - avg_last_minute  → média do último minuto (float)
       - moving_avg_10min → média móvel dos últimos 10 minutos (float)
       - history_10min    → lista de (ts, avg_per_minute) dos últimos 10 min
-      - all_samples      → lista completa de amostras (máx. 720 = 2h)
+      - history_24h      → lista de (ts, avg_per_minute) das últimas 24h
+      - all_samples      → lista completa de amostras (máx. 8640 = 24h)
     """
 
     def __init__(self, model_name: str = "yolov8n.pt"):
@@ -70,14 +71,15 @@ class VehicleDetector:
         self._model_name    = model_name
         self._stream_url    = None
 
-        # Amostras brutas — guardamos as últimas 2 horas (720 amostras × 10s)
-        self._raw: deque[Amostra] = deque(maxlen=720)
+        # Amostras brutas — guardamos as últimas 24 horas (8640 amostras × 10s)
+        self._raw: deque[Amostra] = deque(maxlen=8640)
 
-        # Médias por minuto — guardamos os últimos 10 minutos
-        self._min_avgs: deque[tuple[datetime, float]] = deque(maxlen=10)
+        # Médias por minuto — guardamos as últimas 24 horas (1440 min)
+        self._min_avgs: deque[tuple[datetime, float]] = deque(maxlen=1440)
 
-        self.status         = "iniciando"
-        self._thread        = threading.Thread(target=self._loop, daemon=True)
+        self.status           = "iniciando"
+        self._stream_extracted_at = 0.0   # timestamp da última extração de URL
+        self._thread          = threading.Thread(target=self._loop, daemon=True)
         self._thread.start()
 
     # ── Propriedades públicas (thread-safe) ───────────────────────────────────
@@ -108,6 +110,16 @@ class VehicleDetector:
     @property
     def history_10min(self) -> list[dict]:
         """Histórico dos últimos 10 pontos (1 por minuto) para o gráfico."""
+        with self._lock:
+            items = list(self._min_avgs)[-10:]
+            return [
+                {"ts": ts.isoformat(), "avg": round(avg, 2)}
+                for ts, avg in items
+            ]
+
+    @property
+    def history_24h(self) -> list[dict]:
+        """Histórico completo de médias por minuto (até 24h)."""
         with self._lock:
             return [
                 {"ts": ts.isoformat(), "avg": round(avg, 2)}
@@ -141,6 +153,7 @@ class VehicleDetector:
 
         # Tenta extrair stream HLS do player
         self._stream_url = self._extrair_stream()
+        self._stream_extracted_at = time.monotonic()
 
         last_min_bucket = None   # controla quando avançar o bucket de minuto
         min_bucket_samples: list[float] = []
@@ -200,36 +213,81 @@ class VehicleDetector:
     # ── Captura ───────────────────────────────────────────────────────────────
 
     def _extrair_stream(self) -> str | None:
-        """Tenta extrair URL HLS/RTSP do HTML do player."""
+        """Tenta extrair URL HLS/RTSP do HTML do player (inclui YouTube Live)."""
         try:
             r = requests.get(PLAYER_URL, headers=HEADERS, timeout=10)
             html = r.text
-            padroes = [
+
+            # ── Caso 1: player nativo com stream HLS/RTSP/file/source ─────────
+            padroes_nativos = [
                 r"(https?://[^\s\"']+\.m3u8[^\s\"']*)",
                 r"(rtsp://[^\s\"']+)",
                 r"file\s*:\s*['\"]([^'\"]+)['\"]",
                 r"source['\"]?\s*:\s*['\"]([^'\"]+)['\"]",
             ]
-            for p in padroes:
+            for p in padroes_nativos:
                 m = re.search(p, html, re.IGNORECASE)
                 if m:
                     url = m.group(1)
-                    log.info(f"Stream HLS encontrado: {url}")
+                    log.info(f"Stream nativo encontrado: {url}")
                     return url
+
+            # ── Caso 2: player migrou para YouTube Live ────────────────────────
+            yt_match = re.search(
+                r'youtube\.com/embed/([A-Za-z0-9_-]{11})', html, re.IGNORECASE
+            )
+            if yt_match:
+                yt_id = yt_match.group(1)
+                log.info(f"Player YouTube detectado — video ID: {yt_id}")
+                return self._extrair_stream_youtube(yt_id)
+
         except Exception as e:
             log.warning(f"Não foi possível extrair stream: {e}")
 
-        # Fallback: imagem estática inferida a partir do player URL
         log.warning("Stream não encontrado — usando captura via OpenCV do player.")
+        return None
+
+    def _extrair_stream_youtube(self, video_id: str) -> str | None:
+        """Usa yt-dlp para obter a URL HLS de um YouTube Live."""
+        try:
+            import yt_dlp
+            ydl_opts = {
+                "quiet": True,
+                "no_warnings": True,
+                "format": "best[ext=mp4]/best",
+            }
+            url = f"https://www.youtube.com/watch?v={video_id}"
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=False)
+                stream_url = info.get("url") or (
+                    info.get("formats", [{}])[-1].get("url")
+                )
+                if stream_url:
+                    log.info(f"URL HLS YouTube obtida via yt-dlp ({video_id})")
+                    return stream_url
+        except Exception as e:
+            log.warning(f"yt-dlp falhou para {video_id}: {e}")
         return None
 
     def _capturar(self) -> np.ndarray | None:
         """
         Tenta capturar um frame. Estratégia em cascata:
-          1. OpenCV VideoCapture no PLAYER_URL (funciona se for HLS direto)
+          1. OpenCV VideoCapture no stream (HLS nativo ou YouTube via yt-dlp)
           2. requests + PIL na imagem JPEG estática do player
+        URLs do YouTube expiram — a URL é renovada automaticamente a cada 25 min.
         """
-        # Estratégia 1: OpenCV no stream/player
+        STREAM_TTL = 25 * 60  # URLs YouTube expiram; renova a cada 25 min
+
+        # Renova a URL do stream se expirou
+        age = time.monotonic() - self._stream_extracted_at
+        if self._stream_url and age > STREAM_TTL:
+            log.info("TTL da URL do stream atingido — renovando…")
+            nova = self._extrair_stream()
+            if nova:
+                self._stream_url = nova
+                self._stream_extracted_at = time.monotonic()
+
+        # Estratégia 1: OpenCV no stream
         if self._stream_url:
             cap = cv2.VideoCapture(self._stream_url)
             if cap.isOpened():
@@ -237,11 +295,21 @@ class VehicleDetector:
                 cap.release()
                 if ret and frame is not None:
                     return frame
-            log.warning("Stream HLS falhou — tentando fallback JPEG.")
-            self._stream_url = None   # desativa para não tentar mais
+            log.warning("Stream falhou — tentando renovar URL e fallback JPEG.")
+            # Tenta renovar antes de desistir
+            nova = self._extrair_stream()
+            if nova:
+                self._stream_url = nova
+                self._stream_extracted_at = time.monotonic()
+                cap2 = cv2.VideoCapture(self._stream_url)
+                if cap2.isOpened():
+                    ret, frame = cap2.read()
+                    cap2.release()
+                    if ret and frame is not None:
+                        return frame
+            self._stream_url = None  # desativa após falha dupla
 
         # Estratégia 2: Imagem JPEG do player via requests
-        # O player retorna um <img> ou redireciona para o JPEG
         try:
             r = requests.get(PLAYER_URL, headers=HEADERS, timeout=12, stream=True)
             ct = r.headers.get("Content-Type", "")
@@ -249,9 +317,7 @@ class VehicleDetector:
                 img = Image.open(BytesIO(r.content)).convert("RGB")
                 return cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
 
-            # O player é HTML — tenta extrair src de <img> ou src do player
             html = r.text
-            # Procura por imagens JPEG/JPG referenciadas
             m = re.search(r'src=["\']([^"\']+\.(?:jpg|jpeg|JPG|JPEG))["\']', html)
             if m:
                 img_url = m.group(1)

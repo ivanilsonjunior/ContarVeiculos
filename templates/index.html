@@ -113,7 +113,7 @@
     /* ── Main layout ─────────────────────────────────────────────── */
     main {
       display: grid;
-      grid-template-columns: 1fr 380px;
+      grid-template-columns: 1fr 500px;
       grid-template-rows: auto auto 1fr;
       gap: 20px;
       padding: 24px 32px;
@@ -229,12 +229,29 @@
       background: #000;
       aspect-ratio: 16/9;
     }
+    .snapshot-img-wrapper a {
+      display: block;
+      width: 100%;
+      height: 100%;
+      cursor: zoom-in;
+    }
     #snapshot {
       width: 100%;
       height: 100%;
       object-fit: cover;
       display: block;
       opacity: 0.95;
+      transition: opacity 0.2s;
+    }
+    .snapshot-img-wrapper a:hover #snapshot { opacity: 1; }
+    .snap-hint {
+      position: absolute;
+      top: 8px; right: 10px;
+      font-family: var(--mono);
+      font-size: 0.62rem;
+      color: rgba(200,220,234,0.55);
+      letter-spacing: 1px;
+      pointer-events: none;
     }
     .snapshot-overlay {
       position: absolute;
@@ -292,11 +309,20 @@
       grid-column: 1;
       grid-row: 3;
     }
+    .hist-scroll {
+      max-height: 320px;
+      overflow-y: auto;
+      margin-top: 14px;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) transparent;
+    }
+    .hist-scroll::-webkit-scrollbar { width: 5px; }
+    .hist-scroll::-webkit-scrollbar-track { background: transparent; }
+    .hist-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 
     .hist-table {
       width: 100%;
       border-collapse: collapse;
-      margin-top: 14px;
       font-family: var(--mono);
       font-size: 0.78rem;
     }
@@ -393,7 +419,7 @@
       <div class="kpi-card" data-icon="⏱">
         <div class="kpi-label">Amostras coletadas</div>
         <div class="kpi-value" id="kpi-samples">—</div>
-        <div class="kpi-sub">nas últimas 2 horas</div>
+        <div class="kpi-sub">nas últimas 24 horas</div>
       </div>
     </div>
 
@@ -411,9 +437,12 @@
         <div class="card-label" style="padding:18px 20px 0;">Câmera ao vivo</div>
         <div style="padding:10px 20px 18px;">
           <div class="snapshot-img-wrapper">
-            <img id="snapshot" src="/api/snapshot" alt="Webcam Natal" />
+            <a href="/api/snapshot" target="_blank" rel="noopener">
+              <img id="snapshot" src="/api/snapshot" alt="Webcam Natal" />
+            </a>
             <div class="snapshot-overlay"></div>
             <div class="snapshot-ts" id="snap-ts">carregando…</div>
+            <div class="snap-hint">⤢ abrir em nova guia</div>
           </div>
         </div>
       </div>
@@ -455,19 +484,21 @@
 
     <!-- Histórico por minuto -->
     <div class="card history-section">
-      <div class="card-label">Histórico — médias por minuto (últimos 10 min)</div>
-      <table class="hist-table">
-        <thead>
-          <tr>
-            <th>Minuto</th>
-            <th>Média veículos</th>
-            <th>Variação</th>
-          </tr>
-        </thead>
-        <tbody id="hist-body">
-          <tr><td colspan="3" style="padding:16px 12px;color:var(--muted);">Coletando dados…</td></tr>
-        </tbody>
-      </table>
+      <div class="card-label">Histórico — médias por minuto (últimas 24 horas)</div>
+      <div class="hist-scroll">
+        <table class="hist-table">
+          <thead>
+            <tr>
+              <th>Minuto</th>
+              <th>Média veículos</th>
+              <th>Variação</th>
+            </tr>
+          </thead>
+          <tbody id="hist-body">
+            <tr><td colspan="3" style="padding:16px 12px;color:var(--muted);">Coletando dados…</td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 
   </main>
@@ -605,15 +636,16 @@
           document.getElementById('snap-ts').textContent     = tsLocal;
         }
 
-        // Histórico
-        const hist    = d.history_10min;
+        // Histórico 24h para tabela
+        const hist24  = d.history_24h ?? [];
+        const hist10  = d.history_10min ?? [];
         const histBody = document.getElementById('hist-body');
 
-        if (hist.length === 0) {
+        if (hist24.length === 0) {
           histBody.innerHTML =
             '<tr><td colspan="3" style="padding:16px 12px;color:var(--muted);">Aguardando dados…</td></tr>';
         } else {
-          histBody.innerHTML = [...hist].reverse().map((h, i, arr) => {
+          histBody.innerHTML = [...hist24].reverse().map((h, i, arr) => {
             const tsLocal = new Date(h.ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
             const prev    = arr[i + 1];
             let var_txt = '—', var_color = 'var(--muted)';
@@ -636,7 +668,8 @@
         const sd = await sr.json();
         document.getElementById('kpi-samples').textContent = sd.samples_count;
 
-        // Gráfico
+        // Gráfico (últimos 10 min)
+        const hist = hist10;
         if (hist.length > 0) {
           const labels  = hist.map(h =>
             new Date(h.ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
